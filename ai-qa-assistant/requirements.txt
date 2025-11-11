@@ -1,0 +1,9 @@
+langgraph
+chromadb
+sentence-transformers
+openai
+streamlit
+pypdf2
+python-docx
+scikit-learn
+pandas
