@@ -70,7 +70,6 @@ class VectorStore:
         )
         return [doc for doc in results["documents"][0]]
 
-
 if __name__ == "__main__":
     processor = DocumentProcessor()
     vector_store = VectorStore()
