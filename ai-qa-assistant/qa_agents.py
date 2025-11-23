@@ -212,6 +212,61 @@ class AlignerAgent:
         }
 
 
+class ReviewerAgent:
+    def __call__(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        test_cases = state.get("generated_test_cases", [])
+        validation_results = state.get("validation_results", [])
+        alignment_results = state.get("alignment_results", [])
+
+        improvement_suggestions = []
+
+        missing_scenarios = self._identify_missing_scenarios(
+            test_cases, state.get("retrieved_context", [])
+        )
+
+        for test_case in test_cases:
+            improvement = self._suggest_improvements(
+                test_case, validation_results, alignment_results
+            )
+            improvement_suggestions.append(improvement)
+
+        return {
+            **state,
+            "improvement_suggestions": improvement_suggestions,
+            "missing_scenarios": missing_scenarios,
+            "agent_logs": state.get("agent_logs", [])
+            + ["ReviewerAgent: Provided improvement suggestions"],
+        }
+
+    def _suggest_improvements(
+        self, test_case: Dict, validations: List, alignments: List
+    ) -> Dict:
+        suggestions = []
+
+        # Find validation issues for this test case
+        test_validations = [
+            v for v in validations if v.get("test_id") == test_case.get("test_id")
+        ]
+        test_alignments = [
+            a for a in alignments if a.get("test_id") == test_case.get("test_id")
+        ]
+
+        if test_validations and test_validations[0].get("issues"):
+            suggestions.extend(test_validations[0]["issues"])
+
+        if test_alignments and test_alignments[0].get("alignment_issues"):
+            suggestions.extend(test_alignments[0]["alignment_issues"])
+
+        # Additional improvement suggestions
+        if len(test_case.get("steps", [])) < 2:
+            suggestions.append("Consider adding more detailed steps")
+
+        if not test_case.get("preconditions"):
+            suggestions.append("Add preconditions for better test setup")
+
+        return {"test_id": test_case.get("test_id"), "suggestions": suggestions}
+
+
 if __name__ == "__main__":
     processor = DocumentProcessor()
     vector_store = VectorStore()
