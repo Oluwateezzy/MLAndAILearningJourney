@@ -115,6 +115,64 @@ class TestGeneratorAgent:
             return []
 
 
+class ValidatorAgent:
+    def __call__(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        test_cases = state.get("generated_test_cases", [])
+
+        validation_results = []
+
+        for test_case in test_cases:
+            validation = self._validate_test_case(test_case)
+            validation_results.append(validation)
+
+        return {
+            **state,
+            "validation_results": validation_results,
+            "agent_logs": state.get("agent_logs", [])
+            + ["ValidatorAgent: Validated generated test cases"],
+        }
+
+    def _validate_test_case(self, test_case: Dict[str, Any]) -> Dict[str, Any]:
+        issues = []
+
+        required_fields = [
+            "test_id",
+            "description",
+            "steps",
+            "expected_result",
+            "test_type",
+        ]
+
+        for field in required_fields:
+            if field not in test_case or not test_case[field]:
+                issues.append(f"Missing or empty required field: {field}")
+
+        if not test_case.get("test_type"):
+            issues.append("test_type must be one of: positive, negative, edge")
+
+        return {
+            "test_id": test_case.get("test_id", "N/A"),
+            "is_valid": len(issues) == 0,
+            "issues": issues,
+            "coverage_score": self._calculate_coverage_score(test_case),
+        }
+
+    def _calculate_coverage_score(self, test_case: Dict) -> float:
+        score = 0.0
+        if test_case.get("description"):
+            score += 0.2
+        if test_case.get("steps") and len(test_case["steps"]) > 0:
+            score += 0.3
+        if test_case.get("expected_result"):
+            score += 0.3
+        if (
+            test_case.get("requirements_covered")
+            and len(test_case["requirements_covered"]) > 0
+        ):
+            score += 0.2
+        return score
+
+
 if __name__ == "__main__":
     processor = DocumentProcessor()
     vector_store = VectorStore()
@@ -160,3 +218,9 @@ if __name__ == "__main__":
 
     print("\n=== Final Logs ===")
     print(state["agent_logs"])
+
+    varidator_agent = ValidatorAgent()
+    state = varidator_agent(state)
+    print("\n=== Validation Results ===")
+    for result in state["validation_results"]:
+        print(result)
