@@ -173,6 +173,45 @@ class ValidatorAgent:
         return score
 
 
+class AlignerAgent:
+    def __init__(self, vector_store: VectorStore):
+        self.vector_store = vector_store
+
+    def __call__(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        test_cases = state.get("generated_test_cases", [])
+        context = state.get("retrieved_context", [])
+
+        alignment_results = []
+
+        for test_case in test_cases:
+            alignment = self._check_alignment(test_case, context)
+            alignment_results.append(alignment)
+
+        return {
+            **state,
+            "alignment_results": alignment_results,
+            "agent_logs": state.get("agent_logs", [])
+            + ["AlignerAgent: Checked alignment of test cases with requirements"],
+        }
+
+    def _check_alignment(self, test_case: Dict, context: List[str]) -> Dict[str, Any]:
+        requirements_covered = test_case.get("requirements_covered", [])
+        context_text = " ".join(context).lower()
+
+        alignment_issues = []
+
+        for req in requirements_covered:
+            if req.lower() not in context_text:
+                alignment_issues.append(f"Requirement '{req}' not found in context")
+
+        return {
+            "test_id": test_case.get("test_id", "N/A"),
+            "is_aligned": len(alignment_issues) == 0,
+            "alignment_issues": alignment_issues,
+            "requirements_covered": requirements_covered,
+        }
+
+
 if __name__ == "__main__":
     processor = DocumentProcessor()
     vector_store = VectorStore()
@@ -223,4 +262,10 @@ if __name__ == "__main__":
     state = varidator_agent(state)
     print("\n=== Validation Results ===")
     for result in state["validation_results"]:
+        print(result)
+
+    aligner_agent = AlignerAgent(vector_store)
+    state = aligner_agent(state)
+    print("\n=== Alignment Results ===")
+    for result in state["alignment_results"]:
         print(result)
